@@ -1,0 +1,243 @@
+<html>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+// Original model data
+
+attribute vec4 v_Norm;
+attribute vec4 v_Pos;
+attribute  vec2 vTexCoord;
+attribute  vec4 vColor;
+
+varying float s, t;
+
+
+varying vec2 v_TexCoord; //Data (to be interpolated) that is passed on to the fragment shader
+varying vec4 fColor;
+
+
+uniform vec4 v_Light;
+uniform vec4 v_Camera;
+
+uniform mat4 m_Model;
+uniform mat4 m_View;
+uniform mat4 m_Proj;
+
+
+
+varying vec3 o_Norm;
+varying vec3 o_Camera;
+varying vec3 o_Light;
+
+void main() 
+{
+    mat4 m_ModelView = m_View * m_Model;
+    vec4 tmp_Pos = m_ModelView * v_Pos;
+
+    o_Norm = normalize(m_ModelView * v_Norm).xyz;
+    o_Light = (m_View * v_Light).xyz;
+    o_Camera = normalize(-tmp_Pos).xyz;
+    fColor = vColor;
+    fColor.a = 1.0;
+    
+    float pi = acos(0.0);
+
+
+    s= 0.5*acos(v_Pos.x)/pi;
+
+    t = 0.5*asin(v_Pos.y/sqrt(1.0-v_Pos.x*v_Pos.x))/pi;
+
+    // directional light
+    if (v_Light.w != 0.0 )
+		  o_Light = o_Light - tmp_Pos.xyz;
+
+    gl_Position = m_Proj * tmp_Pos;
+    v_TexCoord = vTexCoord;
+
+} 
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+
+precision mediump float;
+varying  vec2 v_TexCoord;
+uniform sampler2D texture0;
+
+varying float s, t;
+
+
+
+varying vec3 o_Norm;
+varying vec3 o_Camera;
+varying vec3 o_Light;
+varying vec4 fColor;
+
+uniform float col_Shininess;
+uniform vec3 col_Ambient, col_Diffuse, col_Specular;
+uniform vec3 light_Ambient, light_Diffuse, light_Specular;
+
+void main()
+{
+    vec3 N = normalize(o_Norm);
+    vec3 E = normalize(o_Camera);
+    vec3 L = normalize(o_Light);
+
+    vec3 H = normalize(L + E);   
+    vec3 ambient = col_Ambient * light_Ambient;
+
+    float Kd = max(dot(L, N), 0.0);
+	vec3 diffuse = Kd * col_Diffuse * light_Diffuse;
+    
+    float Ks = pow(max(dot(N, H), 0.0), col_Shininess);
+	vec3 specular = Ks * col_Specular * light_Specular;
+
+	// discard the specular highlight if the light's behind the vertex
+	if (dot(L, N) < 0.0) 
+	    specular = vec3(0.0, 0.0, 0.0);
+    
+   
+    
+    // gl_FragColor = texture2D(texture0, v_TexCoord) * (vec4((ambient),1) + vec4((diffuse),1) + vec4((specular),1));
+    //gl_FragColor = fColor;
+    gl_FragColor.xyz =  texture2D(texture0, v_TexCoord).rgb *  (ambient + diffuse + specular);
+	gl_FragColor.a = 1.0;
+   // gl_FragColor =  texture2D(Tex1, v_TexCoord);
+    //gl_FragColor = fColor;
+
+    
+}       </script>
+
+<script type="text/javascript" src="libs/Common/webgl-utils.js"></script>
+<script type="text/javascript" src="libs/Common/initShaders.js"></script>
+<script type="text/javascript" src="libs/Common/MV.js"></script>
+<script type="text/javascript" src="solar-system.js"></script>
+
+<script type="text/javascript" src="./classes/3d-object.js"></script>
+<script type="text/javascript" src="./classes/camera.js"></script>
+<script type="text/javascript" src="./classes/circle.js"></script>
+<script type="text/javascript" src="./classes/cube.js"></script>
+<script type="text/javascript" src="./classes/light.js"></script>
+<script type="text/javascript" src="./classes/sphere.js"></script>
+
+<script type="text/javascript" src="./constants/texture-sources.js"></script>
+<script type="text/javascript" src="./constants/coordinates.js"></script>
+<script type="text/javascript" src="./constants/objects.js"></script>
+
+
+<script type="text/javascript" src="./helpers/core-funcs.js"></script>
+
+<!-- additional libray for selectiong object -->
+<script type="text/javascript" src="libs/uiUtils.js"></script>
+
+<link rel="stylesheet" href="./style/common-style.css">
+<link rel="stylesheet" href="./style/key-style.css">
+<link rel="stylesheet" href="./style/range-slider.css">
+<link rel="stylesheet" href="./style/select.css">
+
+
+
+
+<body>
+    <div class='main'>
+        <canvas class="canvas" id="gl-canvas" width="700" height="700" style="background: url('texture-images/2k_stars_milky_way.jpg')">
+            Oops ... your browser doesn't support the HTML5 canvas element
+        </canvas>
+        <div class='right'>
+            <div class='header'> Instructions </div>
+            <a href="https://youtu.be/d6Ovjb5b9fo" target="blank" class="text"> Demo Link</a>
+
+            <div class="button">
+                <div>
+                    <button id='left' class="push_button blue">A</button>
+                    <span style="margin-left: 40; font-weight: bold;">Left</span>
+                </div>
+
+                <div>
+                    <button id='forward' class="push_button blue">W</button>
+                    <span style="margin-left: 40; font-weight: bold;">Forward</span>
+
+                </div>
+
+                <div>
+                    <button id='right' class="push_button blue">D</button>
+                    <span style="margin-left: 40; font-weight: bold;">Right</span>
+                </div>
+
+                <div>
+                    <button id='backward' class="push_button blue">S</button>
+                    <span style="margin-left: 40; font-weight: bold;">Backward</span>
+                </div>
+
+                <div>
+                    <button id='up' class="push_button blue">Z</button>
+                    <span style="margin-left: 40; font-weight: bold;">Up</span>
+                </div>
+
+                <div>
+                    <button id='down' class="push_button blue">X</button>
+                    <span style="margin-left: 40; font-weight: bold;">Down</span>
+                </div>
+                <div>
+                    <button id='pause' class="push_button blue">P</button>
+                    <span style="margin-left: 40; font-weight: bold;">Pause</span>
+                </div>
+
+            </div>
+            <div class="button">
+                <button id='left1' class="push_button red">&#8592</button>
+                <button id='forward1' class="push_button red">&#8593</button>
+                <button id='right1' class="push_button red">&#8594</button>
+                <button id='backward1' class="push_button red">&#8595</button>
+                <button id='up1' class="push_button red" style="font-size: 12; width: 80;"> page up</button>
+                <button id='down1' class="push_button red" style="font-size: 12; width: 80;">page down</button>
+            </div>
+
+            <div class="text">SELECT ONE OF THESE PLANETS AND ROTATE </div>
+
+            <div class="slidecontainer">
+                <div class="select">
+                    <select name="slct" id="mySelect" onchange="handleChangeSelect();">
+                      <option selected disabled>Choose an option</option>
+                      <option value="0">default - All</option>
+                      <option value="1">sun</option>
+                      <option value="2">mercury</option>
+                      <option value="3">venus</option>
+                      <option value="4">earth</option>
+                      <option value="5">moon</option>
+                      <option value="6">jupiter</option>
+                      <option value="7">saturn</option>
+                      <option value="8">uranus</option>
+                      <option value="9">neptune</option>
+                      <option value="10">pluto</option>
+                    </select>
+                  </div>
+             
+                  <div class="text">Increase speed  1000 times  </div>
+
+
+                <div class="inputRange">
+                  <input type="range" min="1" max="1000" value="1" class="slider" id="speedAroundItself" aria-label="speed for around itself">
+                  speed for around itself
+                  <p>Value: <span id="demo"></span></p>
+                
+                  <input type="range" min="1" max="1000" value="1" class="slider" id="speedAroundSun" aria-label="speed for around sun">
+                  speed for around sun
+                  <p>Value: <span id="demo2"></span></p>
+
+                    ALL  MAIN TASK REQUIREMENTS IS DONE:
+                    <br/>
+                    Extra: track ball, first select planet from options, it will highlight planet then rotate as trackball,
+                     bump map is only applied to pluto but partially, 
+                    Additions, user ables to change each planet rotation speed, can highlight planets, each planet can rotate itself and around sun
+<!--                   
+                  <input type="range" min="1" max="500" value="1" class="slider" id="radius" aria-label="increase radius">
+                    Planet radius
+                  <p>Value: <span id="demo3"></span></p> -->
+
+                </div>
+                  
+                </div>
+           
+
+</body>
+
+</html>
